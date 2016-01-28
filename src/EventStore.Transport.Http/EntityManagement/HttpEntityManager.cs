@@ -30,11 +30,12 @@ namespace EventStore.Transport.Http.EntityManagement
         private readonly ICodec _requestCodec;
         private readonly ICodec _responseCodec;
         private readonly Uri _requestedUrl;
+        private readonly bool _logHttpRequests;
         public readonly DateTime TimeStamp;
 
         internal HttpEntityManager(
             HttpEntity httpEntity, string[] allowedMethods, Action<HttpEntity> onRequestSatisfied, ICodec requestCodec,
-            ICodec responseCodec)
+            ICodec responseCodec, bool logHttpRequests)
         {
             Ensure.NotNull(httpEntity, "httpEntity");
             Ensure.NotNull(allowedMethods, "allowedMethods");
@@ -48,6 +49,9 @@ namespace EventStore.Transport.Http.EntityManagement
             _requestCodec = requestCodec;
             _responseCodec = responseCodec;
             _requestedUrl = httpEntity.RequestedUrl;
+            _logHttpRequests = logHttpRequests;
+
+            LogRequestHeaders();
         }
 
         public ICodec RequestCodec { get { return _requestCodec; } }
@@ -228,6 +232,7 @@ namespace EventStore.Transport.Http.EntityManagement
             if (!BeginReply(code, description, contentType, encoding, headers))
                 return;
 
+            LogResponseHeaders();
             if (response == null || response.Length == 0)
             {
                 SetResponseLength(0);
@@ -235,6 +240,7 @@ namespace EventStore.Transport.Http.EntityManagement
             }
             else
             {
+                LogBody("HTTP Response", response);
                 SetResponseLength(response.Length);
                 BeginWriteResponse();
                 ContinueWriteResponseAsync(response, () => { }, onError, () => { });
@@ -345,6 +351,7 @@ namespace EventStore.Transport.Http.EntityManagement
                 request = new byte[memory.Length];
                 Buffer.BlockCopy(memory.GetBuffer(), 0, request, 0, (int) memory.Length);
             }
+            LogBody("HTTP Request", request);
             state.OnReadSuccess(this, request);
         }
 
@@ -358,6 +365,38 @@ namespace EventStore.Transport.Http.EntityManagement
             catch (Exception e)
             {
                 onError(e);
+            }
+        }
+
+        private void LogRequestHeaders()
+        {
+            if (_logHttpRequests)
+            {
+                Log.Debug("HTTP Request: {0}", HttpEntity.RequestedUrl);
+                foreach (var header in HttpEntity.Request.Headers)
+                {
+                    Log.Debug("HTTP Request: Header - {0} - {1}", header.ToString(), HttpEntity.Request.Headers[header.ToString()]);
+                }
+            }
+        }
+
+        private void LogBody(string logTitle, byte[] body)
+        {
+            if (_logHttpRequests)
+            {
+                Log.Debug("{0}: Body - {1}", logTitle, System.Text.Encoding.Default.GetString(body));
+            }
+        }
+
+        private void LogResponseHeaders()
+        {
+            if (_logHttpRequests)
+            {
+                Log.Debug("HTTP Response: Code {0} Description {1}", HttpEntity.Response.StatusCode, HttpEntity.Response.StatusDescription);
+                foreach (var header in HttpEntity.Response.Headers)
+                {
+                    Log.Debug("HTTP Response: Header - {0} - {1}", header.ToString(), HttpEntity.Response.Headers[header.ToString()]);
+                }
             }
         }
     }
