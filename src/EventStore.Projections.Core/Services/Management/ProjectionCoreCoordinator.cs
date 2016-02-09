@@ -11,7 +11,9 @@ using EventStore.Common.Log;
 namespace EventStore.Projections.Core.Services.Management
 {
     public class ProjectionCoreCoordinator
-        : IHandle<ProjectionManagementMessage.Internal.RegularTimeout>, IHandle<SystemMessage.StateChangeMessage>
+        : IHandle<ProjectionManagementMessage.Internal.RegularTimeout>,
+        IHandle<SystemMessage.StateChangeMessage>,
+        IHandle<SystemMessage.SystemReady>
     {
         private readonly ILogger Log = LogManager.GetLoggerFor<ProjectionCoreCoordinator>();
         private readonly ProjectionType _runProjections;
@@ -43,13 +45,27 @@ namespace EventStore.Projections.Core.Services.Management
                 _timeoutSchedulers[i].Tick();
         }
 
+        private bool _systemReady = false;
+        private VNodeState _currentState = VNodeState.Unknown;
+        public void Handle(SystemMessage.SystemReady message)
+        {
+            _systemReady = true;
+            StartWhenConditionsAreMet();
+        }
+
         public void Handle(SystemMessage.StateChangeMessage message)
         {
-            if (message.State == VNodeState.Master || message.State == VNodeState.Slave)
+            _currentState = message.State;
+            StartWhenConditionsAreMet();
+        }
+
+        private void StartWhenConditionsAreMet()
+        {
+            if (_systemReady && (_currentState == VNodeState.Master || _currentState == VNodeState.Slave))
             {
                 if (!_started)
                 {
-                    Log.Debug("Starting Projections Core. (Node State : {0})", message.State);
+                    Log.Debug("Starting Projections Core. (Node State : {0})", _currentState);
                     Start();
                 }
             }
@@ -57,7 +73,7 @@ namespace EventStore.Projections.Core.Services.Management
             {
                 if (_started)
                 {
-                    Log.Debug("Stopping Projections Core. (Node State : {0})", message.State);
+                    Log.Debug("Stopping Projections Core. (Node State : {0})", _currentState);
                     Stop();
                 }
             }
@@ -105,6 +121,7 @@ namespace EventStore.Projections.Core.Services.Management
         public void SetupMessaging(IBus bus)
         {
             bus.Subscribe<SystemMessage.StateChangeMessage>(this);
+            bus.Subscribe<SystemMessage.SystemReady>(this);
             if (_runProjections >= ProjectionType.System)
             {
                 bus.Subscribe<ProjectionManagementMessage.Internal.RegularTimeout>(this);

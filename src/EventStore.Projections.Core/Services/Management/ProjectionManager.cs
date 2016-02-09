@@ -19,6 +19,7 @@ namespace EventStore.Projections.Core.Services.Management
     public class ProjectionManager
         : IDisposable,
             IHandle<SystemMessage.StateChangeMessage>,
+            IHandle<SystemMessage.SystemReady>,
             IHandle<ClientMessage.ReadStreamEventsBackwardCompleted>,
             IHandle<ClientMessage.WriteEventsCompleted>,
             IHandle<ClientMessage.DeleteStreamCompleted>,
@@ -530,12 +531,27 @@ namespace EventStore.Projections.Core.Services.Management
             _streamDispatcher.Handle(message);
         }
 
+        private VNodeState _currentState = VNodeState.Unknown;
+        private bool _systemIsReady = false;
+        public void Handle(SystemMessage.SystemReady message)
+        {
+            _systemIsReady = true;
+            StartWhenConditionsAreMet();
+        }
+
         public void Handle(SystemMessage.StateChangeMessage message)
         {
-            if (message.State == VNodeState.Master)
+            _currentState = message.State;
+            StartWhenConditionsAreMet();
+        }
+
+        private void StartWhenConditionsAreMet()
+        {
+            if (_currentState == VNodeState.Master)
             {
-                if (!_started)
+                if (!_started && _systemIsReady)
                 {
+                    _logger.Debug("Starting Projections Manager. (Node State : {0})", _currentState);
                     Start();
                 }
             }
@@ -543,6 +559,7 @@ namespace EventStore.Projections.Core.Services.Management
             {
                 if (_started)
                 {
+                    _logger.Debug("Stopping Projections Manager. (Node State : {0})", _currentState);
                     Stop();
                 }
             }
