@@ -134,7 +134,7 @@ namespace EventStore.Projections.Core.Services.Management
         private void PublishCommand(ResolvedEvent resolvedEvent)
         {
             var command = resolvedEvent.Event.EventType;
-            Log.Debug("Response received: {0}", command);
+            Log.Debug("Response received: {0}@{1}", resolvedEvent.OriginalEventNumber, command);
             switch (command)
             {
                 case "$response-reader-starting":

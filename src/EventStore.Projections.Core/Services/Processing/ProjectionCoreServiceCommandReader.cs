@@ -180,7 +180,7 @@ namespace EventStore.Projections.Core.Services.Processing
         private void PublishCommand(EventStore.Core.Data.ResolvedEvent resolvedEvent)
         {
             var command = resolvedEvent.Event.EventType;
-            Log.Debug("Command received: {0}", command);
+            Log.Debug("Command received: {0}@{1}", resolvedEvent.OriginalEventNumber,command);
             switch (command)
             {
                 case "$create-prepared":
