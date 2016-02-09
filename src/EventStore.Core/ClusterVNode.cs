@@ -549,8 +549,11 @@ namespace EventStore.Core
             _mainQueue.Publish(new SystemMessage.SystemInit());
         }
 
+        private int _subSystemsStarted;
         public void Handle(UserManagementMessage.UserManagementServiceInitialized message)
         {
+            bool subSystemsAlreadyStarted = Interlocked.CompareExchange(ref _subSystemsStarted, 1, 0) == 1;
+            if (subSystemsAlreadyStarted) return;
             if (_subsystems != null)
                 foreach (var subsystem in _subsystems)
                     subsystem.Start();
