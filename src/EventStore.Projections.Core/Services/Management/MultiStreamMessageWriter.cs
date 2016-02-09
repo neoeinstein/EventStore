@@ -7,14 +7,13 @@ using EventStore.Core.Data;
 using EventStore.Core.Helpers;
 using EventStore.Core.Messages;
 using EventStore.Core.Services.UserManagement;
-using EventStore.Projections.Core.Utils;
 
 namespace EventStore.Projections.Core.Services.Management
 {
     public sealed class MultiStreamMessageWriter : IMultiStreamMessageWriter
     {
+        private readonly ILogger Log = LogManager.GetLoggerFor<MultiStreamMessageWriter>();
         private readonly IODispatcher _ioDispatcher;
-        private readonly ILogger _logger = LogManager.GetLoggerFor<MultiStreamMessageWriter>();
 
         private readonly Dictionary<Guid, Queue> _queues = new Dictionary<Guid, Queue>();
         private IODispatcherAsync.CancellationScope _cancellationScope;
@@ -34,7 +33,7 @@ namespace EventStore.Projections.Core.Services.Management
                 _queues.Add(workerId, queue);
             }
 
-            queue.Items.Add(new Queue.Item {Command = command, Body = body});
+            queue.Items.Add(new Queue.Item { Command = command, Body = body });
             if (!queue.Busy)
             {
                 EmitEvents(queue, workerId);
@@ -47,10 +46,6 @@ namespace EventStore.Projections.Core.Services.Management
             var events = queue.Items.Select(CreateEvent).ToArray();
             queue.Items.Clear();
             var streamId = "$projections-$" + workerId.ToString("N");
-            foreach (var e in events)
-            {
-              DebugLogger.Log("Writing a {0} command to {1}", e.EventType, streamId);
-            }
             _ioDispatcher.BeginWriteEvents(
                 _cancellationScope,
                 streamId,
@@ -59,15 +54,16 @@ namespace EventStore.Projections.Core.Services.Management
                 events,
                 completed =>
                 {
-                    DebugLogger.Log("Writing to {0} completed", streamId);
+                    Log.Debug("Writing to {0} completed", streamId);
                     queue.Busy = false;
                     if (completed.Result != OperationResult.Success)
                     {
                         var message = string.Format(
-                            "Cannot write commands to the stream {0}. status: {1}",
-                            streamId,
-                            completed.Result);
-                        _logger.Fatal(message);
+                           "Cannot write commands {0} to the {1}. status: {2}",
+                           String.Join("\n", events.Select(x => String.Format("Command: {0}, Body: {1}", x.EventType, Helper.UTF8NoBom.GetString(x.Data)))),
+                           streamId,
+                           completed.Result);
+                        Log.Fatal(message); ;
                         throw new Exception(message);
                     }
 
