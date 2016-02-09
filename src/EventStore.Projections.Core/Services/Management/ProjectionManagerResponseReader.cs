@@ -35,6 +35,7 @@ namespace EventStore.Projections.Core.Services.Management
 
         public void Handle(ProjectionManagementMessage.Starting message)
         {
+            if (_cancellationScope != null) _cancellationScope.Cancel();
             _cancellationScope = new IODispatcherAsync.CancellationScope();
             PerformStartReader().Run();
         }
