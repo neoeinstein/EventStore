@@ -24,6 +24,14 @@ namespace EventStore.Projections.Core.Services.Management
             _cancellationScope = new IODispatcherAsync.CancellationScope();
         }
 
+        public void Reset()
+        {
+            Log.Debug("PROJECTIONS: Resetting Worker Writer");
+            _cancellationScope.Cancel();
+            _cancellationScope = new IODispatcherAsync.CancellationScope();
+            _queues.Clear();
+        }
+
         public void PublishResponse(string command, Guid workerId, object body)
         {
             Queue queue;
@@ -33,6 +41,7 @@ namespace EventStore.Projections.Core.Services.Management
                 _queues.Add(workerId, queue);
             }
 
+            Log.Debug("PROJECTIONS: Scheduling the writing of {0} to {1}. Current status of Writer: Busy: {2}", command, "$projections-$" + workerId, queue.Busy);
             queue.Items.Add(new Queue.Item { Command = command, Body = body });
             if (!queue.Busy)
             {
@@ -54,17 +63,18 @@ namespace EventStore.Projections.Core.Services.Management
                 events,
                 completed =>
                 {
-                    Log.Debug("Writing to {0} completed", streamId);
                     queue.Busy = false;
-                    if (completed.Result != OperationResult.Success)
+                    if (completed.Result == OperationResult.Success)
                     {
-                        var message = string.Format(
-                           "Cannot write commands {0} to the {1}. status: {2}",
-                           String.Join("\n", events.Select(x => String.Format("Command: {0}, Body: {1}", x.EventType, Helper.UTF8NoBom.GetString(x.Data)))),
-                           streamId,
-                           completed.Result);
-                        Log.Fatal(message); ;
-                        throw new Exception(message);
+                        Log.Debug("PROJECTIONS: Finished writing events to {0}: {1}", streamId, String.Join(",", events.Select(x => String.Format("{0}", x.EventType))));
+                    }
+                    else
+                    {
+                        var message = String.Format("PROJECTIONS: Failed writing events to {0} because of {1}: {2}", 
+                            streamId, 
+                            completed.Result, String.Join(",", events.Select(x => String.Format("{0}", x.EventType))));
+                        Log.Debug(message); //Can't do anything about it, log and move on
+                        //throw new Exception(message);
                     }
 
                     if (queue.Items.Count > 0)

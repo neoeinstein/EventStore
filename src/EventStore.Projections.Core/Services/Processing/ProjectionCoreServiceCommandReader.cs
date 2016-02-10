@@ -35,15 +35,18 @@ namespace EventStore.Projections.Core.Services.Processing
 
         public void Handle(ProjectionCoreServiceMessage.StartCore message)
         {
-            if (_cancellationScope != null) {
-                Log.Debug("PROJECTIONS: There was an active cancellation scope for {0}, cancelling now", _coreServiceId);
-                _cancellationScope.Cancel();
-            }
             _cancellationScope = new IODispatcherAsync.CancellationScope();
             Log.Debug("PROJECTIONS: Starting Projection Core Reader (reads from $projections-${0})", _coreServiceId);
             _stopped = false;
             StartCoreSteps().Run();
             ControlSteps().Run();
+        }
+
+        public void Handle(ProjectionCoreServiceMessage.StopCore message)
+        {
+            Log.Debug("Stopping Projection Core Reader ({0})", _coreServiceId);
+            _cancellationScope.Cancel();
+            _stopped = true;
         }
 
         private IEnumerable<IODispatcherAsync.Step> ControlSteps()
@@ -150,7 +153,32 @@ namespace EventStore.Projections.Core.Services.Processing
                     new StreamMetadata(maxAge: ProjectionNamesBuilder.CoreControlStreamMaxAge),
                     completed => { });
 
+            ClientMessage.ReadStreamEventsBackwardCompleted readResult = null;
+            yield return
+                _ioDispatcher.BeginReadBackward(
+                _cancellationScope,
+                    coreControlStreamID,
+                    -1,
+                    1,
+                    false,
+                    SystemAccount.Principal,
+                    completed => readResult = completed);
+
+
             var from = 0;
+
+            if (readResult.Result == ReadStreamResult.NoStream)
+            {
+                from = 0;
+            }
+            else
+            {
+                if (readResult.Result != ReadStreamResult.Success)
+                    throw new Exception("Cannot start control reader. Read result: " + readResult.Result);
+
+                from = readResult.LastEventNumber + 1;
+            }
+
             Log.Debug("PROJECTIONS: Finished Starting Projection Core Reader (reads from $projections-${0})", _coreServiceId);
             while (!_stopped)
             {
@@ -317,13 +345,6 @@ namespace EventStore.Projections.Core.Services.Processing
                 default:
                     throw new Exception("Unknown command: " + command);
             }
-        }
-
-        public void Handle(ProjectionCoreServiceMessage.StopCore message)
-        {
-            Log.Debug("Stopping Projection Core Reader ({0})", _coreServiceId);
-            _cancellationScope.Cancel();
-            _stopped = true;
         }
     }
 }

@@ -117,6 +117,7 @@ namespace EventStore.Projections.Core
             mainBus.Subscribe(ioDispatcher.Writer);
             mainBus.Subscribe(ioDispatcher);
 
+            mainBus.Subscribe<ProjectionManagementMessage.Starting>(projectionManagerCommadnWriter);
             mainBus.Subscribe<CoreProjectionManagementMessage.CreatePrepared>(projectionManagerCommadnWriter);
             mainBus.Subscribe<CoreProjectionManagementMessage.CreateAndPrepare>(projectionManagerCommadnWriter);
             mainBus.Subscribe<CoreProjectionManagementMessage.CreateAndPrepareSlave>(projectionManagerCommadnWriter);
