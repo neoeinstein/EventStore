@@ -35,8 +35,13 @@ namespace EventStore.Projections.Core.Services.Management
 
         public void Handle(ProjectionManagementMessage.Starting message)
         {
-            if (_cancellationScope != null) _cancellationScope.Cancel();
+            if (_cancellationScope != null)
+            {
+                Log.Debug("PROJECTIONS: There was an active cancellation scope, cancelling now");
+                _cancellationScope.Cancel();
+            }
             _cancellationScope = new IODispatcherAsync.CancellationScope();
+            Log.Debug("PROJECTIONS: Starting Projection Manager Response Reader (reads from $projections-$master)");
             PerformStartReader().Run();
         }
 
@@ -89,6 +94,7 @@ namespace EventStore.Projections.Core.Services.Management
             if (writeResult.Result != OperationResult.Success)
                 throw new Exception("Cannot start response reader. Write result: " + writeResult.Result);
 
+            Log.Debug("PROJECTIONS: Finished Starting Projection Manager Response Reader (reads from $projections-$master)");
             while (true)
             {
                 var eof = false;
@@ -134,7 +140,7 @@ namespace EventStore.Projections.Core.Services.Management
         private void PublishCommand(ResolvedEvent resolvedEvent)
         {
             var command = resolvedEvent.Event.EventType;
-            Log.Debug("Response received: {0}@{1}", resolvedEvent.OriginalEventNumber, command);
+            Log.Debug("PROJECTIONS: Response received: {0}@{1}", resolvedEvent.OriginalEventNumber, command);
             switch (command)
             {
                 case "$response-reader-starting":

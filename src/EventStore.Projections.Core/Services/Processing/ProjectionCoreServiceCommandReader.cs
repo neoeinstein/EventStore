@@ -34,9 +34,13 @@ namespace EventStore.Projections.Core.Services.Processing
         }
 
         public void Handle(ProjectionCoreServiceMessage.StartCore message)
-        { 
-            Log.Debug("Starting Projection Core Reader ({0})", _coreServiceId);
+        {
+            if (_cancellationScope != null) {
+                Log.Debug("PROJECTIONS: There was an active cancellation scope for {0}, cancelling now", _coreServiceId);
+                _cancellationScope.Cancel();
+            }
             _cancellationScope = new IODispatcherAsync.CancellationScope();
+            Log.Debug("PROJECTIONS: Starting Projection Core Reader (reads from $projections-${0})", _coreServiceId);
             _stopped = false;
             StartCoreSteps().Run();
             ControlSteps().Run();
@@ -145,7 +149,9 @@ namespace EventStore.Projections.Core.Services.Processing
                     SystemAccount.Principal,
                     new StreamMetadata(maxAge: ProjectionNamesBuilder.CoreControlStreamMaxAge),
                     completed => { });
+
             var from = 0;
+            Log.Debug("PROJECTIONS: Finished Starting Projection Core Reader (reads from $projections-${0})", _coreServiceId);
             while (!_stopped)
             {
                 var eof = false;
@@ -180,7 +186,7 @@ namespace EventStore.Projections.Core.Services.Processing
         private void PublishCommand(EventStore.Core.Data.ResolvedEvent resolvedEvent)
         {
             var command = resolvedEvent.Event.EventType;
-            Log.Debug("Command received: {0}@{1}", resolvedEvent.OriginalEventNumber,command);
+            Log.Debug("PROJECTIONS: Command received: {0}@{1}", resolvedEvent.OriginalEventNumber,command);
             switch (command)
             {
                 case "$create-prepared":

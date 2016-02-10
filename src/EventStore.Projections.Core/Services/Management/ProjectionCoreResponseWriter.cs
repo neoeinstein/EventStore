@@ -1,4 +1,5 @@
-﻿using EventStore.Core.Bus;
+﻿using EventStore.Common.Log;
+using EventStore.Core.Bus;
 using EventStore.Projections.Core.Messages;
 using EventStore.Projections.Core.Messages.Persisted.Responses;
 
@@ -27,6 +28,7 @@ namespace EventStore.Projections.Core.Services.Management
             IHandle<ProjectionManagementMessage.Command.UpdateQuery>,
             IHandle<ProjectionManagementMessage.Command.Delete>
     {
+        private readonly ILogger _logger = LogManager.GetLoggerFor<ProjectionCoreResponseWriter>();
         private readonly IResponseWriter _writer;
 
         public ProjectionCoreResponseWriter(IResponseWriter responseWriter)

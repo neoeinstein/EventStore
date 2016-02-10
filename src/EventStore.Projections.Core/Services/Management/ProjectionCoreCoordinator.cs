@@ -65,7 +65,7 @@ namespace EventStore.Projections.Core.Services.Management
             {
                 if (!_started)
                 {
-                    Log.Debug("Starting Projections Core. (Node State : {0})", _currentState);
+                    Log.Debug("PROJECTIONS: Starting Projections Core Coordinator. (Node State : {0})", _currentState);
                     Start();
                 }
             }
@@ -73,7 +73,7 @@ namespace EventStore.Projections.Core.Services.Management
             {
                 if (_started)
                 {
-                    Log.Debug("Stopping Projections Core. (Node State : {0})", _currentState);
+                    Log.Debug("PROJECTIONS: Stopping Projections Core Coordinator. (Node State : {0})", _currentState);
                     Stop();
                 }
             }

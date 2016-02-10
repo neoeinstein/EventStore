@@ -551,7 +551,7 @@ namespace EventStore.Projections.Core.Services.Management
             {
                 if (!_started && _systemIsReady)
                 {
-                    _logger.Debug("Starting Projections Manager. (Node State : {0})", _currentState);
+                    _logger.Debug("PROJECTIONS: Starting Projections Manager. (Node State : {0})", _currentState);
                     Start();
                 }
             }
@@ -559,7 +559,7 @@ namespace EventStore.Projections.Core.Services.Management
             {
                 if (_started)
                 {
-                    _logger.Debug("Stopping Projections Manager. (Node State : {0})", _currentState);
+                    _logger.Debug("PROJECTIONS: Stopping Projections Manager. (Node State : {0})", _currentState);
                     Stop();
                 }
             }
@@ -606,6 +606,7 @@ namespace EventStore.Projections.Core.Services.Management
 
         private void StartExistingProjections(Action completed)
         {
+            _logger.Debug("PROJECTIONS: Reading/Starting Existing Projections from $projections-$all");
             BeginLoadProjectionList(completed);
         }
 
@@ -649,6 +650,7 @@ namespace EventStore.Projections.Core.Services.Management
                     .Where(x => x.Event != null)
                     .ToArray();
 
+                _logger.Debug("PROJECTIONS: Found the following projections in {0}. {1}", completed.EventStreamId, String.Join(",", grouped.Select(x => Helper.UTF8NoBom.GetString(x.Event.Data))));
                 if (grouped.IsNotEmpty())
                     foreach (var @event in grouped)
                     {
@@ -678,9 +680,7 @@ namespace EventStore.Projections.Core.Services.Management
             {
                 if (!anyFound)
                 {
-                    _logger.Info(
-                        "Projection manager is initializing from the empty {0} stream",
-                        completed.EventStreamId);
+                    _logger.Debug("PROJECTIONS: No projections were found in {0}, starting from empty stream", completed.EventStreamId);
                     if ((completed.Result == ReadStreamResult.Success || completed.Result == ReadStreamResult.NoStream)
                         && completed.Events.Length == 0)
                     {
@@ -761,15 +761,15 @@ namespace EventStore.Projections.Core.Services.Management
                     "");
                 CreateSystemProjection(
                     ProjectionNamesBuilder.StandardProjections.StreamByCategoryStandardProjection,
-                    typeof (CategorizeStreamByPath),
+                    typeof(CategorizeStreamByPath),
                     "first\r\n-");
                 CreateSystemProjection(
                     ProjectionNamesBuilder.StandardProjections.EventByCategoryStandardProjection,
-                    typeof (CategorizeEventsByStreamPath),
+                    typeof(CategorizeEventsByStreamPath),
                     "first\r\n-");
                 CreateSystemProjection(
                     ProjectionNamesBuilder.StandardProjections.EventByTypeStandardProjection,
-                    typeof (IndexEventsByEventType),
+                    typeof(IndexEventsByEventType),
                     "");
             }
         }
@@ -979,6 +979,7 @@ namespace EventStore.Projections.Core.Services.Management
 
             _projectionsMap.Add(projectionCorrelationId, name);
             _projections.Add(name, managedProjectionInstance);
+            _logger.Debug("Adding projection {0}@{1} to list", projectionCorrelationId, name);
             return managedProjectionInstance;
         }
 
