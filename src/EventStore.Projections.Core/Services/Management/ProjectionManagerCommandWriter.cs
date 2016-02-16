@@ -26,7 +26,6 @@ namespace EventStore.Projections.Core.Services.Management
             _commandWriter = commandWriter;
         }
 
-        private readonly ILogger _logger = LogManager.GetLoggerFor<ProjectionManagerCommandWriter>();
         public void Handle(ProjectionManagementMessage.Starting message)
         {
             _commandWriter.Reset();
